@@ -25,6 +25,7 @@ class Player
         @velocity_y = 0
         @touching_ground = false
         @win = false
+        @died_ago=0
     end
 
     def change_move(event)
@@ -48,8 +49,6 @@ class Player
             @inMove=true
             @jump=true
 
-        when 'down'
-            @sprite.play animation: :die, loop: true
       end
     end
 
@@ -74,108 +73,73 @@ class Player
 
         @touching_ground=hasColision(@sprite.x, @sprite.y + 1)
 
+        if @sprite.y + 1 > $window_height - $tile_size then
+            @die = true
+        end
+
         if @die then
             @sprite.play animation: :die, loop: true
-            @sprite.y+=0.5
-            if  @sprite.y > $window_height then
+            @sprite.y+=1
+            @died_ago+=dt
+            if  @sprite.y > $window_height or @died_ago > 0.5 then
                 @died = true
             end
             return
         end
     
-
-        if @touching_ground && @jump == false then
-            @velocity_y = 0
-        else
-            @velocity_y+=dt*20
-            if @touching_ground == false && hasColision(@sprite.x, @sprite.y + @velocity_y) then
-                if @velocity_y > 0  then
-                    @velocity_y = $tile_size - @sprite.y % $tile_size
-                else
-                    @velocity_y = 0
-                end
-                
-            end
-        end
+        fight_monsters()
+        collect_coins()
+        drop(dt, @sprite.x, @sprite.y, @jump)
 
         @sprite.y+=@velocity_y
 
 
         if @inMove then
             if @direction == 'r' then
-                for i in 1 .. 4
-                    if !hasColision(@sprite.x+1, @sprite.y) then
-                        @sprite.x+=1
-                    end
-                end
+                @sprite.x+=can_move_right(@sprite.x,@sprite.y,4)
             end
             if @direction == 'l' then
-                for i in 1 .. 4
-                    if !hasColision(@sprite.x-1, @sprite.y) then
-                        @sprite.x-=1
-                    end
-                end
+                @sprite.x-=can_move_left(@sprite.x,@sprite.y,4)
             end
  
             if @jump == true then
                 if @touching_ground then
                     @velocity_y = -12
-                    
                 end
                 @jump=false
             end
             
         end
 
-
     end
 
-    def hasColision(x_coord, y_coord)
-        if y_coord > $window_height - $tile_size then
-            @die = true
-            return true
-        end
-
-        if x_coord < 0 or x_coord > $window_width - $tile_size then
-            return true
-        end
-
-        tiles_range = tiles_that_colide(x_coord,y_coord)
-
-        
-        for i in 0 .. tiles_range.size - 1
-            if $level_map[tiles_range[i][1]][tiles_range[i][0]] != 0 then
-                return true
+    def collect_coins()
+        for i in 0..$coins.size - 1 
+            if has_dynamic_colision(@sprite.x,@sprite.y,$coins[i].x,$coins[i].y) then
+                $points+=1
+                $coins.delete_at(i)
+                if $points== $points_to_win then
+                    @win = true
+                end
+                break
             end
         end
-        return false
     end
 
-    def tiles_that_colide(x_coord, y_coord)
-        tiles_range=[]
-
-        tile_x =  x_coord / $tile_size
-        tile_y = y_coord / $tile_size
-        if (x_coord % $tile_size) ==  0 then
-
-           if (y_coord % $tile_size) ==  0 then
-                tiles_range.append([tile_x, tile_y])
-           else
-                tiles_range.append([tile_x, tile_y])
-                tiles_range.append([tile_x, tile_y + 1])
-            end
-        else
-            if (y_coord % $tile_size) ==  0 then
-                tiles_range.append([tile_x, tile_y])
-                tiles_range.append([tile_x + 1, tile_y])
-           else
-                tiles_range.append([x_coord / $tile_size, tile_y])
-                tiles_range.append([x_coord / $tile_size, tile_y + 1])
-                tiles_range.append([x_coord / $tile_size + 1, tile_y])
-                tiles_range.append([x_coord / $tile_size + 1, tile_y + 1])
+    def fight_monsters()
+        for i in 0..$monsters.size - 1 
+            if $monsters[i].die== false && has_dynamic_colision(@sprite.x,@sprite.y,$monsters[i].sprite.x,$monsters[i].sprite.y) then
+                if ($monsters[i].sprite.y > @sprite.y) then
+                    $monsters[i].sprite
+                        $monsters[i].die=true
+                        @velocity_y=-7
+                        break
+                else
+                    @die = true
+                    break
+                end
             end
         end
-        return tiles_range
     end
 
 end
